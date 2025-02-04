@@ -1,5 +1,5 @@
 {
-  "name": "smart-server",
+  "name": "sm-server",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
@@ -8,15 +8,15 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/longnguyen1305/smart-server.git"
+    "url": "git+https://github.com/longnguyen1305/sm-server.git"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/longnguyen1305/smart-server/issues"
+    "url": "https://github.com/longnguyen1305/sm-server/issues"
   },
-  "homepage": "https://github.com/longnguyen1305/smart-server#readme",
+  "homepage": "https://github.com/longnguyen1305/sm-server#readme",
   "dependencies": {
     "bcrypt": "^5.1.1",
     "cors": "^2.8.5",
