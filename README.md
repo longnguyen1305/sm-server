@@ -1,1 +1,1 @@
-# smart-server
+# SM-Server
