@@ -15,4 +15,15 @@ router.get("/", authorization, async (req, res) => {
     }
 })
 
+router.get("/project", authorization, async (req, res) => {
+    try {
+
+        res.download('./results/RadixSpline.zip');
+        
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send("Server Error");
+    }
+})
+
 module.exports = router;
