@@ -3,18 +3,11 @@ const authorization = require("../middleware/authorization");
 const multer = require("multer");
 const pool = require("../db");
 const minioClient = require("../minioClient");
+const stream = require("stream");
 
 require("dotenv").config();
 
-const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-      cb(null, './uploads')
-    },
-    filename: function (req, file, cb) {
-      cb(null, file.originalname)
-    }
-})
-const upload = multer({ storage });
+const upload = multer({ storage: multer.memoryStorage() });
 
 router.post("/upload", authorization, upload.single('zipfile'), async (req, res) => {
     try {
@@ -31,8 +24,12 @@ router.post("/upload", authorization, upload.single('zipfile'), async (req, res)
       // Store file into MinIO
       const bucketName = process.env.MINIO_BUCKET_NAME;
       const filePath = `${req.user.id}/${projectId}/${file.originalname}`;
+      const fileStream = new stream.PassThrough();
+      fileStream.end(file.buffer);
       
-      await minioClient.fPutObject(bucketName, filePath, file.path);
+      await minioClient.putObject(bucketName, filePath, fileStream, file.size, {
+        "Content-Type": file.mimetype
+      });
 
       // Add new folder to database
       const folderQuery = `
