@@ -1,8 +1,6 @@
 const router = require("express").Router();
 const pool = require("../db");
 const authorization = require("../middleware/authorization");
-const express = require("express");
-const fs = require("fs");
 const minioClient = require("../minioClient");
 
 require("dotenv").config();
@@ -70,24 +68,44 @@ router.get("/projects/:projectId", authorization, async (req, res) => {
     }
 })
 
-router.use('/metrics/images', express.static('./results/metrics/images'));
-
-router.get("/metrics", authorization, async (req, res) => {
+router.get("/metrics/:projectId", authorization, async (req, res) => {
     try {
+        const bucketName = process.env.MINIO_BUCKET_NAME;
+        const metricsWithLinks = [];
+        const path = "metrics";
 
-        fs.readdir('./results/metrics/images', (err, files) => {
-            if (err) {
-                console.error("Error reading metrics folder:", err.message);
-                return res.status(500).json({ message: "Error fetching metrics" });
+        const objectsStream = minioClient.listObjectsV2(bucketName, path, true);
+
+        // Collect all metric paths
+        const metricsPath = [];
+        objectsStream.on("data", (obj) => {
+            metricsPath.push(obj.name);
+        });
+
+        objectsStream.on("end", async () => {
+            try {
+                const promises = metricsPath.map(async (metricPath) => {
+                    const metricLink = await minioClient.presignedGetObject(bucketName, metricPath, 3600);
+                    metricsWithLinks.push({
+                        metric_name: metricPath.split("/").pop(),
+                        metric_url: metricLink
+                    });
+                });
+
+                await Promise.all(promises);
+                res.json({ success: true, metrics: metricsWithLinks });
+
+            } catch (err) {
+                console.error("Error generating pre-signed URLs:", err);
+                res.status(500).json({ error: "Failed to generate metric URLs" });
             }
+        });
 
-            const images = files.map(file => ({
-                name: file,
-                url: `/metrics/images/${file}`
-            }));
+        objectsStream.on("error", (err) => {
+            console.error("Error listing metric files:", err);
+            res.status(500).json({ error: "Error fetching metrics" });
+        });
 
-            res.json({ images });
-        })
     } catch (err) {
         console.error(err.message);
         res.status(500).send("Server Error");
