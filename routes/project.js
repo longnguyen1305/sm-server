@@ -16,7 +16,7 @@ router.post("/upload", authorization, upload.single('zipfile'), async (req, res)
       // Add new project to database
       const projectQuery = `
         INSERT INTO projects (user_id, project_name, project_status)
-        VALUES ($1, $2, 'pending') RETURNING *;
+        VALUES ($1, $2, 'completed') RETURNING *;
       `;
       const newProject = await pool.query(projectQuery, [req.user.id, file.originalname]);
       const projectId = newProject.rows[0].project_id;
