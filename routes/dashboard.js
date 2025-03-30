@@ -1,7 +1,7 @@
 const router = require("express").Router();
 const pool = require("../db");
 const authorization = require("../middleware/authorization");
-const minioClient = require("../minioClient");
+const supabaseClient = require("../utils/supabaseClient");
 
 require("dotenv").config();
 
@@ -45,7 +45,7 @@ router.get("/projects", authorization, async (req, res) => {
 router.get("/projects/:projectId", authorization, async (req, res) => {
     try {
         const { projectId } = req.params;
-        const bucketName = process.env.MINIO_BUCKET_NAME;
+        const bucketName = process.env.SUPABASE_BUCKET;
 
         const foldersQuery = `
             SELECT folder_path_input FROM folders 
@@ -55,12 +55,16 @@ router.get("/projects/:projectId", authorization, async (req, res) => {
         const result = await pool.query(foldersQuery, [projectId]);
         const filePath = result.rows[0].folder_path_input;
 
-        minioClient.getObject(bucketName, filePath, (err, stream) => {
-            if (err) {
-                return res.status(500).json({ error: err.message });
-            }
-            stream.pipe(res);
-        });
+        const { data, error } = await supabaseClient
+            .storage
+            .from(bucketName)
+            .createSignedUrl(filePath, 3600); // 1 hour signed URL
+
+        if (error) {
+            return res.status(500).json({ error: error.message });
+        }
+
+        res.redirect(data.signedUrl);
 
     } catch (err) {
         console.error(err.message);
@@ -70,41 +74,37 @@ router.get("/projects/:projectId", authorization, async (req, res) => {
 
 router.get("/metrics/:projectId", authorization, async (req, res) => {
     try {
-        const bucketName = process.env.MINIO_BUCKET_NAME;
+        const bucketName = process.env.SUPABASE_BUCKET;
         const metricsWithLinks = [];
         const path = "metrics";
 
-        const objectsStream = minioClient.listObjectsV2(bucketName, path, true);
+        const { data: objects, error } = await supabaseClient
+            .storage
+            .from(bucketName)
+            .list(path);
 
-        // Collect all metric paths
-        const metricsPath = [];
-        objectsStream.on("data", (obj) => {
-            metricsPath.push(obj.name);
+        if (error) {
+            console.error("Error listing metrics:", error);
+            return res.status(500).json({ error: "Error fetching metrics" });
+        }
+
+        if (!objects || objects.length === 0) {
+            return res.json({ success: true, metrics: [] });
+        }
+
+        objects.forEach((obj) => {
+            const publicUrl = supabaseClient
+                .storage
+                .from(bucketName)
+                .getPublicUrl(`${path}/${obj.name}`).data.publicUrl;
+      
+            metricsWithLinks.push({
+                metric_name: obj.name,
+                metric_url: publicUrl,
+            });
         });
 
-        objectsStream.on("end", async () => {
-            try {
-                const promises = metricsPath.map(async (metricPath) => {
-                    const metricLink = await minioClient.presignedGetObject(bucketName, metricPath, 3600);
-                    metricsWithLinks.push({
-                        metric_name: metricPath.split("/").pop(),
-                        metric_url: metricLink
-                    });
-                });
-
-                await Promise.all(promises);
-                res.json({ success: true, metrics: metricsWithLinks });
-
-            } catch (err) {
-                console.error("Error generating pre-signed URLs:", err);
-                res.status(500).json({ error: "Failed to generate metric URLs" });
-            }
-        });
-
-        objectsStream.on("error", (err) => {
-            console.error("Error listing metric files:", err);
-            res.status(500).json({ error: "Error fetching metrics" });
-        });
+        res.json({ success: true, metrics: metricsWithLinks });
 
     } catch (err) {
         console.error(err.message);

@@ -2,8 +2,7 @@ const router = require("express").Router();
 const authorization = require("../middleware/authorization");
 const multer = require("multer");
 const pool = require("../db");
-const minioClient = require("../minioClient");
-const stream = require("stream");
+const supabaseClient = require("../utils/supabaseClient");
 
 require("dotenv").config();
 
@@ -21,15 +20,21 @@ router.post("/upload", authorization, upload.single('zipfile'), async (req, res)
       const newProject = await pool.query(projectQuery, [req.user.id, file.originalname]);
       const projectId = newProject.rows[0].project_id;
 
-      // Store file into MinIO
-      const bucketName = process.env.MINIO_BUCKET_NAME;
+      // Store file into Supabase
+      const bucketName = process.env.SUPABASE_BUCKET;
       const filePath = `${req.user.id}/${projectId}/${file.originalname}`;
-      const fileStream = new stream.PassThrough();
-      fileStream.end(file.buffer);
       
-      await minioClient.putObject(bucketName, filePath, fileStream, file.size, {
-        "Content-Type": file.mimetype
-      });
+      const { error: uploadError } = await supabaseClient.storage
+        .from(bucketName)
+        .upload(filePath, file.buffer, {
+          contentType: file.mimetype,
+          upsert: true,
+        });
+
+      if (uploadError) {
+        console.error("Upload error:", uploadError);
+        return res.status(500).json({ error: "Failed to upload file to Supabase" });
+      }
 
       // Add new folder to database
       const folderQuery = `
