@@ -21,7 +21,7 @@ CREATE TABLE projects(
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 );
 
-INSERT INTO projects (user_id, project_name, project_status)
+INSERT INTO projects (user_id, project_name, project_status);
 VALUES ((SELECT user_id FROM users WHERE user_email = 'longnguyen@gmail.com'), 'AI Code Optimizer', 'pending');
 -----------------------------------------------------------
 CREATE TABLE folders(
@@ -33,7 +33,7 @@ CREATE TABLE folders(
     FOREIGN KEY (project_id) REFERENCES projects(project_id) ON DELETE CASCADE
 );
 
-INSERT INTO folders (project_id, folder_path_input, folder_path_output)
+INSERT INTO folders (project_id, folder_path_input, folder_path_output);
 VALUES
     ((SELECT project_id FROM projects WHERE project_name = 'AI Code Optimizer'),
         '/minio/uploads/long/project1/', NULL);
@@ -47,7 +47,7 @@ CREATE TABLE metrics(
     FOREIGN KEY (project_id) REFERENCES projects(project_id) ON DELETE CASCADE
 );
 
-INSERT INTO metrics (project_id, metric_type, metric_path)
+INSERT INTO metrics (project_id, metric_type, metric_path);
 VALUES
     ((SELECT project_id FROM projects WHERE project_name = 'AI Code Optimizer'),
         'execution_time_chart',
