@@ -42,36 +42,6 @@ router.get("/projects", authorization, async (req, res) => {
     }
 })
 
-router.get("/projects/:projectId", authorization, async (req, res) => {
-    try {
-        const { projectId } = req.params;
-        const bucketName = process.env.SUPABASE_BUCKET;
-
-        const foldersQuery = `
-            SELECT folder_path_input FROM folders 
-            WHERE project_id = $1 
-            ORDER BY folder_createtime DESC;
-        `;
-        const result = await pool.query(foldersQuery, [projectId]);
-        const filePath = result.rows[0].folder_path_input;
-
-        const { data, error } = await supabaseClient
-            .storage
-            .from(bucketName)
-            .createSignedUrl(filePath, 3600); // 1 hour signed URL
-
-        if (error) {
-            return res.status(500).json({ error: error.message });
-        }
-
-        res.redirect(data.signedUrl);
-
-    } catch (err) {
-        console.error(err.message);
-        res.status(500).send("Server Error");
-    }
-})
-
 router.get("/metrics/:projectId", authorization, async (req, res) => {
     try {
         const bucketName = process.env.SUPABASE_BUCKET;
